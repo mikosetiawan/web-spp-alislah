@@ -74,8 +74,8 @@
                                 <div>
                                     <label for="birth_date" class="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                                     <input type="date" name="birth_date" id="birth_date" value="{{ old('birth_date') }}" 
-                                        class="form-input mt-1 block w-full" required>
-                                    <p id="birth_date_error" class="mt-1 text-sm text-red-600 hidden">Usia harus minimal 18 tahun.</p>
+                                        class="form-input mt-1 block w-full" max="2018-12-31" required>
+                                    <p id="birth_date_error" class="mt-1 text-sm text-red-600 hidden">Tanggal lahir harus pada tahun 2018 atau sebelumnya.</p>
                                     @error('birth_date')
                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -173,18 +173,13 @@
     <script>
         document.getElementById('birth_date').addEventListener('change', function() {
             const birthDate = new Date(this.value);
-            const today = new Date();
-            const age = today.getFullYear() - birthDate.getFullYear();
-            const monthDiff = today.getMonth() - birthDate.getMonth();
-            const dayDiff = today.getDate() - birthDate.getDate();
-
-            // Perhitungan usia yang lebih akurat
-            let isUnder18 = age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)));
-            
+            const birthYear = birthDate.getFullYear();
             const errorElement = document.getElementById('birth_date_error');
-            if (isUnder18) {
+
+            // Validasi tahun lahir harus 2018 atau sebelumnya
+            if (birthYear > 2018) {
                 errorElement.classList.remove('hidden');
-                this.setCustomValidity('Usia harus minimal 18 tahun.');
+                this.setCustomValidity('Tanggal lahir harus pada tahun 2018 atau sebelumnya.');
             } else {
                 errorElement.classList.add('hidden');
                 this.setCustomValidity('');
@@ -195,17 +190,12 @@
         document.getElementById('studentForm').addEventListener('submit', function(event) {
             const birthDateInput = document.getElementById('birth_date');
             const birthDate = new Date(birthDateInput.value);
-            const today = new Date();
-            const age = today.getFullYear() - birthDate.getFullYear();
-            const monthDiff = today.getMonth() - birthDate.getMonth();
-            const dayDiff = today.getDate() - birthDate.getDate();
+            const birthYear = birthDate.getFullYear();
 
-            let isUnder18 = age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)));
-            
-            if (isUnder18) {
+            if (birthYear > 2018) {
                 event.preventDefault();
                 document.getElementById('birth_date_error').classList.remove('hidden');
-                birthDateInput.setCustomValidity('Usia harus minimal 18 tahun.');
+                birthDateInput.setCustomValidity('Tanggal lahir harus pada tahun 2018 atau sebelumnya.');
             }
         });
     </script>
