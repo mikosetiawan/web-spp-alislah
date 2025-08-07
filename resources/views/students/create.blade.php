@@ -4,7 +4,7 @@
             <h2 class="text-xl font-bold text-gray-900">Tambah Data Siswa Baru</h2>
         </div>
         
-        <form action="{{ route('students.store') }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route('students.store') }}" method="POST" enctype="multipart/form-data" id="studentForm">
             @csrf
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -75,6 +75,7 @@
                                     <label for="birth_date" class="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                                     <input type="date" name="birth_date" id="birth_date" value="{{ old('birth_date') }}" 
                                         class="form-input mt-1 block w-full" required>
+                                    <p id="birth_date_error" class="mt-1 text-sm text-red-600 hidden">Usia harus minimal 18 tahun.</p>
                                     @error('birth_date')
                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -168,4 +169,44 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.getElementById('birth_date').addEventListener('change', function() {
+            const birthDate = new Date(this.value);
+            const today = new Date();
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            const dayDiff = today.getDate() - birthDate.getDate();
+
+            // Perhitungan usia yang lebih akurat
+            let isUnder18 = age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)));
+            
+            const errorElement = document.getElementById('birth_date_error');
+            if (isUnder18) {
+                errorElement.classList.remove('hidden');
+                this.setCustomValidity('Usia harus minimal 18 tahun.');
+            } else {
+                errorElement.classList.add('hidden');
+                this.setCustomValidity('');
+            }
+        });
+
+        // Validasi saat form disubmit
+        document.getElementById('studentForm').addEventListener('submit', function(event) {
+            const birthDateInput = document.getElementById('birth_date');
+            const birthDate = new Date(birthDateInput.value);
+            const today = new Date();
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            const dayDiff = today.getDate() - birthDate.getDate();
+
+            let isUnder18 = age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)));
+            
+            if (isUnder18) {
+                event.preventDefault();
+                document.getElementById('birth_date_error').classList.remove('hidden');
+                birthDateInput.setCustomValidity('Usia harus minimal 18 tahun.');
+            }
+        });
+    </script>
 </x-app-layout>
