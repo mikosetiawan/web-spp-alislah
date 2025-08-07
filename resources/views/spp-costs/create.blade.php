@@ -35,10 +35,11 @@
                     </div>
 
                     <div>
-                        <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
-                        <input type="number" name="year" id="year" min="2025" max="2099" step="1" value="{{ old('year', now()->year) }}" 
-                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                        <p id="year_error" class="mt-1 text-sm text-red-600 hidden">Tahun harus tahun berjalan (2025) atau tahun ke depan.</p>
+                        <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Tahun Ajaran</label>
+                        <input type="text" name="year" id="year" value="{{ old('year', now()->year . '/' . (now()->year + 1)) }}" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                               placeholder="YYYY/YYYY+1" pattern="\d{4}/\d{4}" required>
+                        <p id="year_error" class="mt-1 text-sm text-red-600 hidden">Tahun ajaran harus dimulai dari 2025 atau setelahnya dan dalam format YYYY/YYYY+1.</p>
                         @error('year')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -76,26 +77,45 @@
             const yearInput = this.value;
             const currentYear = new Date().getFullYear(); // 2025
             const errorElement = document.getElementById('year_error');
+            const regex = /^(\d{4})\/(\d{4})$/;
 
-            // Validasi tahun harus 2025 atau lebih
-            if (yearInput < currentYear) {
+            if (!regex.test(yearInput)) {
+                errorElement.textContent = 'Format tahun ajaran harus YYYY/YYYY+1.';
                 errorElement.classList.remove('hidden');
-                this.setCustomValidity('Tahun harus tahun berjalan (2025) atau tahun ke depan.');
+                this.setCustomValidity('Format tidak valid.');
+                return;
+            }
+
+            const [startYear, endYear] = yearInput.split('/').map(Number);
+            if (startYear < currentYear || endYear !== startYear + 1) {
+                errorElement.textContent = `Tahun ajaran harus dimulai dari ${currentYear} atau setelahnya dan dalam format YYYY/YYYY+1.`;
+                errorElement.classList.remove('hidden');
+                this.setCustomValidity('Tahun ajaran tidak valid.');
             } else {
                 errorElement.classList.add('hidden');
                 this.setCustomValidity('');
             }
         });
 
-        // Validasi saat form disubmit
         document.getElementById('sppForm').addEventListener('submit', function(event) {
             const yearInput = document.getElementById('year').value;
             const currentYear = new Date().getFullYear(); // 2025
+            const regex = /^(\d{4})\/(\d{4})$/;
 
-            if (yearInput < currentYear) {
+            if (!regex.test(yearInput)) {
                 event.preventDefault();
+                document.getElementById('year_error').textContent = 'Format tahun ajaran harus YYYY/YYYY+1.';
                 document.getElementById('year_error').classList.remove('hidden');
-                document.getElementById('year').setCustomValidity('Tahun harus tahun berjalan (2025) atau tahun ke depan.');
+                document.getElementById('year').setCustomValidity('Format tidak valid.');
+                return;
+            }
+
+            const [startYear, endYear] = yearInput.split('/').map(Number);
+            if (startYear < currentYear || endYear !== startYear + 1) {
+                event.preventDefault();
+                document.getElementById('year_error').textContent = `Tahun ajaran harus dimulai dari ${currentYear} atau setelahnya dan dalam format YYYY/YYYY+1.`;
+                document.getElementById('year_error').classList.remove('hidden');
+                document.getElementById('year').setCustomValidity('Tahun ajaran tidak valid.');
             }
         });
     </script>

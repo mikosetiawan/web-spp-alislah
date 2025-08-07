@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class Student extends Model
 {
@@ -23,8 +24,8 @@ class Student extends Model
         'birth_place',
         'photo',
         'status',
-        'parent_name',  // Sudah ada
-        'parent_phone'  // Sudah ada
+        'parent_name',
+        'parent_phone'
     ];
 
     protected $casts = [
@@ -33,10 +34,9 @@ class Student extends Model
 
     protected $appends = ['unpaid_months', 'full_name', 'initials'];
 
-    // Relasi ke Class (perbaikan nama model Classes menjadi Class)
     public function class()
     {
-        return $this->belongsTo(ClassModel::class, 'class_id'); // Diasumsikan nama model Class diganti menjadi ClassModel
+        return $this->belongsTo(ClassModel::class, 'class_id');
     }
 
     public function payments()
@@ -49,13 +49,11 @@ class Student extends Model
         return $this->payments()->where('status', 'paid');
     }
 
-    // Accessor untuk nama lengkap dengan gelar
     public function getFullNameAttribute()
     {
         return $this->name . ($this->gender === 'L' ? ' Sdn' : ' Sdri');
     }
 
-    // Accessor untuk inisial nama
     public function getInitialsAttribute()
     {
         $names = explode(' ', $this->name);
@@ -70,7 +68,6 @@ class Student extends Model
         return $initials;
     }
 
-
     public function scopeSearch($query, $term)
     {
         $term = "%$term%";
@@ -83,19 +80,15 @@ class Student extends Model
             });
     }
 
-    // Scope untuk siswa aktif
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
 
-    // Scope untuk siswa tidak aktif
     public function scopeInactive($query)
     {
         return $query->where('status', 'inactive');
     }
-
-    // Di dalam App\Models\Student
 
     public function getPaymentStatusAttribute()
     {
@@ -113,19 +106,22 @@ class Student extends Model
         }, $status === 'unpaid' ? '=' : '>', 0);
     }
 
-    // Di dalam model Student, tambahkan method berikut:
-
     public function getUnpaidMonthsAttribute()
     {
         $currentDate = now();
         $currentYear = $currentDate->year;
         $currentMonth = $currentDate->format('m');
 
+        // Get active academic year
+        $academicYear = request()->input('academic_year') ?? $this->getCurrentAcademicYear();
+        Log::info("Checking unpaid months for student {$this->id} in academic year {$academicYear}");
+
         if (!$this->class) {
+            Log::warning("Student {$this->id} has no class assigned");
             return collect();
         }
 
-        // Ambil semua pembayaran yang sudah dibayar
+        // Get all paid months
         $paidMonths = $this->payments()
             ->where('status', 'paid')
             ->get()
@@ -134,51 +130,54 @@ class Student extends Model
             })
             ->toArray();
 
-        // Dapatkan biaya SPP untuk kelas ini
-        $sppCosts = SppCost::where('class_id', $this->class_id)
-            ->orderBy('year', 'desc')
-            ->get();
+        // Get SPP costs for this academic year
+        $sppCosts = SppCost::getCostForAcademicYear($this->class_id, $academicYear);
 
         if ($sppCosts->isEmpty()) {
+            Log::warning("No SPP costs found for class {$this->class_id} in academic year {$academicYear}");
             return collect();
         }
 
         $unpaidMonths = collect();
         $months = [
-            '01' => 'Januari',
-            '02' => 'Februari',
-            '03' => 'Maret',
-            '04' => 'April',
-            '05' => 'Mei',
-            '06' => 'Juni',
-            '07' => 'Juli',
-            '08' => 'Agustus',
-            '09' => 'September',
-            '10' => 'Oktober',
-            '11' => 'November',
-            '12' => 'Desember'
+            '01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
+            '04' => 'April', '05' => 'Mei', '06' => 'Juni',
+            '07' => 'Juli', '08' => 'Agustus', '09' => 'September',
+            '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
         ];
 
-        // Periksa untuk setiap tahun yang memiliki biaya SPP
-        foreach ($sppCosts as $sppCost) {
-            $year = $sppCost->year;
+        // Split academic year into start and end years
+        [$startYear, $endYear] = explode('/', $academicYear);
 
-            // Jika tahun ini, hanya periksa sampai bulan saat ini
-            $maxMonth = ($year == $currentYear) ? $currentMonth : '12';
+        // Academic year months: July (start year) to June (end year)
+        $academicMonths = [
+            ['year' => $startYear, 'months' => ['07', '08', '09', '10', '11', '12']],
+            ['year' => $endYear, 'months' => ['01', '02', '03', '04', '05', '06']]
+        ];
 
-            for ($month = 1; $month <= $maxMonth; $month++) {
-                $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT);
-                $monthValue = $months[$monthKey] ?? 'Unknown';
-                $fullMonth = "$year-$monthKey";
+        foreach ($academicMonths as $period) {
+            $year = $period['year'];
+            $monthList = $period['months'];
 
-                // Skip jika bulan ini di masa depan (untuk tahun berjalan)
+            foreach ($monthList as $month) {
+                // Skip future months in current academic year
                 if ($year == $currentYear && $month > $currentMonth) {
                     continue;
                 }
 
-                // Cek apakah bulan ini belum dibayar
+                $monthKey = $month;
+                $monthValue = $months[$monthKey] ?? 'Unknown';
+                $fullMonth = "$year-$monthKey";
+
+                // Check if this month is unpaid
                 if (!in_array($fullMonth, $paidMonths)) {
-                    $dueDate = Carbon::create($year, $month, 10); // Jatuh tempo tgl 10
+                    $sppCost = $sppCosts->firstWhere('year', $year);
+                    if (!$sppCost) {
+                        Log::warning("No SPP cost found for year {$year} in academic year {$academicYear}");
+                        continue;
+                    }
+
+                    $dueDate = Carbon::create($year, $month, 10); // Due date is 10th of each month
                     $isOverdue = $currentDate->greaterThan($dueDate);
 
                     $unpaidMonths->push([
@@ -188,14 +187,60 @@ class Student extends Model
                         'due_date' => $dueDate->format('Y-m-d'),
                         'is_overdue' => $isOverdue,
                         'spp_cost_id' => $sppCost->id,
-                        'year' => $year
+                        'year' => $year,
+                        'academic_year' => $academicYear
                     ]);
                 }
             }
         }
 
-        // Urutkan dari bulan terlama ke terbaru
+        // Sort by month (oldest first)
         return $unpaidMonths->sortBy('month')->values();
     }
 
+    /**
+     * Get current academic year based on system date
+     * Format: YYYY/YYYY (e.g. 2023/2024)
+     */
+    public static function getCurrentAcademicYear()
+    {
+        $currentDate = now();
+        $currentYear = $currentDate->year;
+        $currentMonth = $currentDate->month;
+
+        // Academic year runs from July to June
+        if ($currentMonth >= 7) { // July or later
+            return $currentYear . '/' . ($currentYear + 1);
+        } else { // January to June
+            return ($currentYear - 1) . '/' . $currentYear;
+        }
+    }
+
+    /**
+     * Get list of academic years for selection
+     */
+    public static function getAcademicYearOptions($yearsBack = 5, $yearsForward = 1)
+    {
+        $currentAcademicYear = self::getCurrentAcademicYear();
+        [$startYear, $endYear] = explode('/', $currentAcademicYear);
+
+        $options = [];
+
+        // Previous years
+        for ($i = $yearsBack; $i >= 1; $i--) {
+            $options[] = ($startYear - $i) . '/' . ($endYear - $i);
+        }
+
+        // Current and future years
+        for ($i = 0; $i <= $yearsForward; $i++) {
+            $options[] = ($startYear + $i) . '/' . ($endYear + $i);
+        }
+
+        return $options;
+    }
+
+    public function sppBills()
+    {
+        return $this->hasMany(SppBill::class);
+    }
 }

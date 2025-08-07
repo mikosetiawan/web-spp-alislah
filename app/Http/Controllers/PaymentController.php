@@ -14,46 +14,276 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PaymentController extends Controller
 {
+    // public function index(Request $request)
+    // {
+    //     $query = Student::with([
+    //         'class',
+    //         'payments' => function ($q) {
+    //             $q->whereYear('month', now()->year);
+    //         }
+    //     ])->active();
+
+    //     // Filter berdasarkan kelas
+    //     if ($request->has('class_id') && $request->class_id != '') {
+    //         $query->where('class_id', $request->class_id);
+    //     }
+
+    //     // Filter berdasarkan status pembayaran
+    //     if ($request->has('payment_status') && $request->payment_status != 'all') {
+    //         if ($request->payment_status == 'paid') {
+    //             $query->whereHas('payments', function ($q) {
+    //                 $q->whereYear('month', now()->year)
+    //                     ->where('status', 'paid');
+    //             });
+    //         } else {
+    //             $query->whereDoesntHave('payments', function ($q) {
+    //                 $q->whereYear('month', now()->year)
+    //                     ->where('status', 'paid');
+    //             });
+    //         }
+    //     }
+
+    //     $students = $query->orderBy('name')->paginate(20);
+    //     $classes = ClassModel::all();
+
+    //     // Tambahkan informasi status pembayaran untuk setiap siswa
+    //     $students->each(function ($student) {
+    //         $student->payment_status = $student->getPaymentStatusAttribute();
+    //         $student->unpaid_count = $student->unpaid_months->count();
+    //     });
+
+    //     return view('payments.index', compact('students', 'classes'));
+    // }
+
+
+
+
+    // public function index(Request $request)
+    // {
+    //     $query = Student::with([
+    //         'class',
+    //         'payments' => function ($q) use ($request) {
+    //             // Filter pembayaran berdasarkan tahun pelajaran
+    //             if ($request->has('academic_year') && $request->academic_year != '') {
+    //                 [$startYear, $endYear] = explode('/', $request->academic_year);
+    //                 $q->where(function ($query) use ($startYear, $endYear) {
+    //                     $query->whereYear('month', $startYear)
+    //                         ->whereMonth('month', '>=', 7)
+    //                         ->orWhereYear('month', $endYear)
+    //                         ->whereMonth('month', '<=', 6);
+    //                 });
+    //             } else {
+    //                 $q->whereYear('month', now()->year);
+    //             }
+    //         }
+    //     ])->active();
+
+    //     // Filter berdasarkan kelas
+    //     if ($request->has('class_id') && $request->class_id != '') {
+    //         $query->where('class_id', $request->class_id);
+    //     }
+
+    //     // Filter berdasarkan status pembayaran
+    //     if ($request->has('payment_status') && $request->payment_status != 'all') {
+    //         if ($request->payment_status == 'paid') {
+    //             $query->whereHas('payments', function ($q) use ($request) {
+    //                 if ($request->has('academic_year') && $request->academic_year != '') {
+    //                     [$startYear, $endYear] = explode('/', $request->academic_year);
+    //                     $q->where(function ($query) use ($startYear, $endYear) {
+    //                         $query->whereYear('month', $startYear)
+    //                             ->whereMonth('month', '>=', 7)
+    //                             ->orWhereYear('month', $endYear)
+    //                             ->whereMonth('month', '<=', 6);
+    //                     });
+    //                 } else {
+    //                     $q->whereYear('month', now()->year);
+    //                 }
+    //                 $q->where('status', 'paid');
+    //             });
+    //         } else {
+    //             $query->whereDoesntHave('payments', function ($q) use ($request) {
+    //                 if ($request->has('academic_year') && $request->academic_year != '') {
+    //                     [$startYear, $endYear] = explode('/', $request->academic_year);
+    //                     $q->where(function ($query) use ($startYear, $endYear) {
+    //                         $query->whereYear('month', $startYear)
+    //                             ->whereMonth('month', '>=', 7)
+    //                             ->orWhereYear('month', $endYear)
+    //                             ->whereMonth('month', '<=', 6);
+    //                     });
+    //                 } else {
+    //                     $q->whereYear('month', now()->year);
+    //                 }
+    //                 $q->where('status', 'paid');
+    //             });
+    //         }
+    //     }
+
+    //     $students = $query->orderBy('name')->paginate(20);
+    //     $classes = ClassModel::all();
+
+    //     // Daftar tahun pelajaran untuk filter
+    //     $academicYears = $this->getAcademicYears();
+
+    //     // Tambahkan informasi status pembayaran untuk setiap siswa
+    //     $students->each(function ($student) use ($request) {
+    //         $student->payment_status = $student->getPaymentStatusAttribute();
+    //         $student->unpaid_count = $student->unpaid_months->count();
+    //     });
+
+    //     return view('payments.index', compact('students', 'classes', 'academicYears'));
+    // }
+
+    // /**
+    //  * Helper method untuk mendapatkan daftar tahun pelajaran
+    //  */
+    // protected function getAcademicYears()
+    // {
+    //     $currentYear = now()->year;
+    //     $years = Payment::select(DB::raw("DISTINCT YEAR(month) as year"))
+    //         ->orderBy('year', 'desc')
+    //         ->pluck('year')
+    //         ->toArray();
+
+    //     $academicYears = [];
+    //     foreach ($years as $year) {
+    //         $academicYears[] = ($year - 1) . '/' . $year;
+    //         $academicYears[] = $year . '/' . ($year + 1);
+    //     }
+
+    //     // Tambahkan tahun pelajaran saat ini jika belum ada
+    //     $currentAcademicYear = (now()->month < 7 ? ($currentYear - 1) : $currentYear) . '/' . (now()->month < 7 ? $currentYear : ($currentYear + 1));
+    //     if (!in_array($currentAcademicYear, $academicYears)) {
+    //         $academicYears[] = $currentAcademicYear;
+    //     }
+
+    //     return array_unique($academicYears);
+    // }
+
+
+    /**
+     * Helper method untuk mendapatkan daftar tahun pelajaran
+     */
+    protected function getAcademicYears()
+    {
+        $currentYear = now()->year;
+        $years = Payment::select(DB::raw("DISTINCT YEAR(month) as year"))
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->toArray();
+
+        $academicYears = [];
+        foreach ($years as $year) {
+            $academicYears[] = ($year - 1) . '/' . $year;
+            $academicYears[] = $year . '/' . ($year + 1);
+        }
+
+        // Tambahkan tahun pelajaran saat ini jika belum ada
+        $currentAcademicYear = (now()->month < 7 ? ($currentYear - 1) : $currentYear) . '/' . (now()->month < 7 ? $currentYear : ($currentYear + 1));
+        if (!in_array($currentAcademicYear, $academicYears)) {
+            $academicYears[] = $currentAcademicYear;
+        }
+
+        return array_unique($academicYears);
+    }
+
+
+
     public function index(Request $request)
     {
         $query = Student::with([
             'class',
-            'payments' => function ($q) {
-                $q->whereYear('month', now()->year);
+            'payments' => function ($q) use ($request) {
+                if ($request->has('academic_year') && $request->academic_year != '') {
+                    [$startYear, $endYear] = explode('/', $request->academic_year);
+                    $q->where(function ($query) use ($startYear, $endYear) {
+                        $query->whereYear('month', $startYear)
+                            ->whereMonth('month', '>=', 7)
+                            ->orWhereYear('month', $endYear)
+                            ->whereMonth('month', '<=', 6);
+                    });
+                } else {
+                    $q->whereYear('month', now()->year);
+                }
             }
         ])->active();
 
-        // Filter berdasarkan kelas
+        // Filter by class
         if ($request->has('class_id') && $request->class_id != '') {
             $query->where('class_id', $request->class_id);
         }
 
-        // Filter berdasarkan status pembayaran
+        // Filter by payment status
         if ($request->has('payment_status') && $request->payment_status != 'all') {
             if ($request->payment_status == 'paid') {
-                $query->whereHas('payments', function ($q) {
-                    $q->whereYear('month', now()->year)
-                        ->where('status', 'paid');
+                $query->whereHas('payments', function ($q) use ($request) {
+                    if ($request->has('academic_year') && $request->academic_year != '') {
+                        [$startYear, $endYear] = explode('/', $request->academic_year);
+                        $q->where(function ($query) use ($startYear, $endYear) {
+                            $query->whereYear('month', $startYear)
+                                ->whereMonth('month', '>=', 7)
+                                ->orWhereYear('month', $endYear)
+                                ->whereMonth('month', '<=', 6);
+                        });
+                    } else {
+                        $q->whereYear('month', now()->year);
+                    }
+                    $q->where('status', 'paid');
                 });
             } else {
-                $query->whereDoesntHave('payments', function ($q) {
-                    $q->whereYear('month', now()->year)
-                        ->where('status', 'paid');
+                $query->whereDoesntHave('payments', function ($q) use ($request) {
+                    if ($request->has('academic_year') && $request->academic_year != '') {
+                        [$startYear, $endYear] = explode('/', $request->academic_year);
+                        $q->where(function ($query) use ($startYear, $endYear) {
+                            $query->whereYear('month', $startYear)
+                                ->whereMonth('month', '>=', 7)
+                                ->orWhereYear('month', $endYear)
+                                ->whereMonth('month', '<=', 6);
+                        });
+                    } else {
+                        $q->whereYear('month', now()->year);
+                    }
+                    $q->where('status', 'paid');
                 });
             }
         }
 
         $students = $query->orderBy('name')->paginate(20);
         $classes = ClassModel::all();
+        $academicYears = $this->getAcademicYears();
 
-        // Tambahkan informasi status pembayaran untuk setiap siswa
-        $students->each(function ($student) {
+        // Get current academic year
+        $currentAcademicYear = $this->getCurrentAcademicYear();
+
+        // Add payment status for each student
+        $students->each(function ($student) use ($request) {
             $student->payment_status = $student->getPaymentStatusAttribute();
             $student->unpaid_count = $student->unpaid_months->count();
         });
 
-        return view('payments.index', compact('students', 'classes'));
+        return view('payments.index', compact(
+            'students',
+            'classes',
+            'academicYears',
+            'currentAcademicYear'
+        ));
     }
+
+    /**
+     * Get current academic year
+     */
+    protected function getCurrentAcademicYear()
+    {
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        if ($currentMonth >= 7) { // July or later
+            return $currentYear . '/' . ($currentYear + 1);
+        } else { // January to June
+            return ($currentYear - 1) . '/' . $currentYear;
+        }
+    }
+
+
 
     public function show(Student $student)
     {
@@ -138,7 +368,6 @@ class PaymentController extends Controller
         return response()->json($student->unpaid_months);
     }
 
-    // app/Http/Controllers/PaymentController.php
 
     public function report(Request $request)
     {
