@@ -21,7 +21,7 @@
             </div>
             @endif
 
-            <form action="{{ route('spp-costs.store') }}" method="POST">
+            <form action="{{ route('spp-costs.store') }}" method="POST" id="sppForm">
                 @csrf
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -36,7 +36,12 @@
 
                     <div>
                         <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
-                        <input type="number" name="year" id="year" min="2000" max="2099" step="1" value="{{ old('year') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        <input type="number" name="year" id="year" min="2025" max="2099" step="1" value="{{ old('year', now()->year) }}" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        <p id="year_error" class="mt-1 text-sm text-red-600 hidden">Tahun harus tahun berjalan (2025) atau tahun ke depan.</p>
+                        @error('year')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div>
@@ -45,8 +50,12 @@
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <span class="text-gray-500">Rp</span>
                             </div>
-                            <input type="number" name="amount" id="amount" value="{{ old('amount') }}" class="block w-full pl-10 pr-12 py-2 rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="0" required>
+                            <input type="number" name="amount" id="amount" value="{{ old('amount') }}" 
+                                   class="block w-full pl-10 pr-12 py-2 rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="0" required>
                         </div>
+                        @error('amount')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
 
@@ -61,4 +70,33 @@
             </form>
         </div>
     </div>
+
+    <script>
+        document.getElementById('year').addEventListener('input', function() {
+            const yearInput = this.value;
+            const currentYear = new Date().getFullYear(); // 2025
+            const errorElement = document.getElementById('year_error');
+
+            // Validasi tahun harus 2025 atau lebih
+            if (yearInput < currentYear) {
+                errorElement.classList.remove('hidden');
+                this.setCustomValidity('Tahun harus tahun berjalan (2025) atau tahun ke depan.');
+            } else {
+                errorElement.classList.add('hidden');
+                this.setCustomValidity('');
+            }
+        });
+
+        // Validasi saat form disubmit
+        document.getElementById('sppForm').addEventListener('submit', function(event) {
+            const yearInput = document.getElementById('year').value;
+            const currentYear = new Date().getFullYear(); // 2025
+
+            if (yearInput < currentYear) {
+                event.preventDefault();
+                document.getElementById('year_error').classList.remove('hidden');
+                document.getElementById('year').setCustomValidity('Tahun harus tahun berjalan (2025) atau tahun ke depan.');
+            }
+        });
+    </script>
 </x-app-layout>
