@@ -59,10 +59,13 @@ class SppCostController extends Controller
         foreach ($students as $student) {
             // Create 12 monthly bills for the academic year
             [$startYear] = explode('/', $request->year);
+            $academicYear = $request->year; // This is already in YYYY/YYYY format
+
             for ($month = 7; $month <= 12; $month++) { // July to December
                 SppBill::create([
                     'student_id' => $student->id,
                     'spp_cost_id' => $sppCost->id,
+                    'academic_year' => $academicYear,
                     'month' => $month,
                     'year' => $startYear,
                     'amount' => $request->amount,
@@ -73,6 +76,7 @@ class SppCostController extends Controller
                 SppBill::create([
                     'student_id' => $student->id,
                     'spp_cost_id' => $sppCost->id,
+                    'academic_year' => $academicYear,
                     'month' => $month,
                     'year' => $startYear + 1,
                     'amount' => $request->amount,

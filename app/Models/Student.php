@@ -106,97 +106,82 @@ class Student extends Model
         }, $status === 'unpaid' ? '=' : '>', 0);
     }
 
+
     public function getUnpaidMonthsAttribute()
     {
-        $currentDate = now();
-        $currentYear = $currentDate->year;
-        $currentMonth = $currentDate->format('m');
+        try {
+            $academicYear = request()->input('academic_year') ?? $this->getCurrentAcademicYear();
 
-        // Get active academic year
-        $academicYear = request()->input('academic_year') ?? $this->getCurrentAcademicYear();
-        Log::info("Checking unpaid months for student {$this->id} in academic year {$academicYear}");
+            if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) {
+                $academicYear = $this->getCurrentAcademicYear();
+            }
 
-        if (!$this->class) {
-            Log::warning("Student {$this->id} has no class assigned");
-            return collect();
-        }
+            [$startYear, $endYear] = explode('/', $academicYear);
 
-        // Get all paid months
-        $paidMonths = $this->payments()
-            ->where('status', 'paid')
-            ->get()
-            ->map(function ($payment) {
-                return Carbon::parse($payment->month)->format('Y-m');
-            })
-            ->toArray();
+            // Query untuk bulan yang belum dibayar
+            $paidMonths = $this->payments()
+                ->where(function ($q) use ($startYear, $endYear) {
+                    $q->whereYear('month', $startYear)->whereMonth('month', '>=', 7)
+                        ->orWhereYear('month', $endYear)->whereMonth('month', '<=', 6);
+                })
+                ->pluck('month')
+                ->map(function ($date) {
+                    return Carbon::parse($date)->format('Y-m');
+                })
+                ->toArray();
 
-        // Get SPP costs for this academic year
-        $sppCosts = SppCost::getCostForAcademicYear($this->class_id, $academicYear);
+            // Generate semua bulan dalam tahun ajaran
+            $allMonths = [];
+            for ($year = $startYear; $year <= $endYear; $year++) {
+                $startMonth = ($year == $startYear) ? 7 : 1;
+                $endMonth = ($year == $endYear) ? 6 : 12;
 
-        if ($sppCosts->isEmpty()) {
-            Log::warning("No SPP costs found for class {$this->class_id} in academic year {$academicYear}");
-            return collect();
-        }
-
-        $unpaidMonths = collect();
-        $months = [
-            '01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
-            '04' => 'April', '05' => 'Mei', '06' => 'Juni',
-            '07' => 'Juli', '08' => 'Agustus', '09' => 'September',
-            '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-        ];
-
-        // Split academic year into start and end years
-        [$startYear, $endYear] = explode('/', $academicYear);
-
-        // Academic year months: July (start year) to June (end year)
-        $academicMonths = [
-            ['year' => $startYear, 'months' => ['07', '08', '09', '10', '11', '12']],
-            ['year' => $endYear, 'months' => ['01', '02', '03', '04', '05', '06']]
-        ];
-
-        foreach ($academicMonths as $period) {
-            $year = $period['year'];
-            $monthList = $period['months'];
-
-            foreach ($monthList as $month) {
-                // Skip future months in current academic year
-                if ($year == $currentYear && $month > $currentMonth) {
-                    continue;
-                }
-
-                $monthKey = $month;
-                $monthValue = $months[$monthKey] ?? 'Unknown';
-                $fullMonth = "$year-$monthKey";
-
-                // Check if this month is unpaid
-                if (!in_array($fullMonth, $paidMonths)) {
-                    $sppCost = $sppCosts->firstWhere('year', $year);
-                    if (!$sppCost) {
-                        Log::warning("No SPP cost found for year {$year} in academic year {$academicYear}");
-                        continue;
-                    }
-
-                    $dueDate = Carbon::create($year, $month, 10); // Due date is 10th of each month
-                    $isOverdue = $currentDate->greaterThan($dueDate);
-
-                    $unpaidMonths->push([
-                        'month' => $fullMonth,
-                        'month_name' => "$monthValue $year",
-                        'amount' => $sppCost->amount,
-                        'due_date' => $dueDate->format('Y-m-d'),
-                        'is_overdue' => $isOverdue,
-                        'spp_cost_id' => $sppCost->id,
-                        'year' => $year,
-                        'academic_year' => $academicYear
-                    ]);
+                for ($month = $startMonth; $month <= $endMonth; $month++) {
+                    $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT);
+                    $allMonths[] = "$year-$monthKey";
                 }
             }
-        }
 
-        // Sort by month (oldest first)
-        return $unpaidMonths->sortBy('month')->values();
+            // Filter bulan yang belum dibayar
+            $unpaidMonths = array_diff($allMonths, $paidMonths);
+
+            // Format output
+            $monthNames = [
+                '01' => 'Januari',
+                '02' => 'Februari',
+                '03' => 'Maret',
+                '04' => 'April',
+                '05' => 'Mei',
+                '06' => 'Juni',
+                '07' => 'Juli',
+                '08' => 'Agustus',
+                '09' => 'September',
+                '10' => 'Oktober',
+                '11' => 'November',
+                '12' => 'Desember'
+            ];
+
+            $result = collect();
+            foreach ($unpaidMonths as $month) {
+                [$year, $monthNum] = explode('-', $month);
+                $result->push([
+                    'month' => $month,
+                    'month_name' => $monthNames[$monthNum] . ' ' . $year,
+                    'amount' => $this->class->sppCosts->where('year', $year)->first()->amount ?? 0,
+                    'due_date' => Carbon::create($year, $monthNum, 10)->format('Y-m-d'),
+                    'is_overdue' => now()->greaterThan(Carbon::create($year, $monthNum, 10))
+                ]);
+            }
+
+            return $result->sortBy('month');
+
+        } catch (\Exception $e) {
+            logger()->error("Error in getUnpaidMonthsAttribute: " . $e->getMessage());
+            return collect();
+        }
     }
+
+
 
     /**
      * Get current academic year based on system date
@@ -243,4 +228,7 @@ class Student extends Model
     {
         return $this->hasMany(SppBill::class);
     }
+
+
+
 }

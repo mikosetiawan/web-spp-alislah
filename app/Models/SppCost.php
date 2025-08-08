@@ -77,4 +77,42 @@ class SppCost extends Model
             ->get()
             ->keyBy('year');
     }
+
+
+    // In SppCost.php
+    protected static function booted()
+    {
+        static::created(function ($sppCost) {
+            $sppCost->generateBillsForClassStudents();
+        });
+    }
+
+    public function generateBillsForClassStudents()
+    {
+        $students = $this->class->students()->active()->get();
+
+        foreach ($students as $student) {
+            SppBill::firstOrCreate([
+                'student_id' => $student->id,
+                'spp_cost_id' => $this->id,
+                'academic_year' => $this->getAcademicYearFromYear(),
+                'amount' => $this->amount,
+                'status' => 'unpaid'
+            ]);
+        }
+    }
+
+    protected function getAcademicYearFromYear()
+    {
+        $year = (int) $this->year; // Explicitly cast to integer
+        $currentDate = now();
+        $currentMonth = $currentDate->month;
+
+        if ($currentMonth >= 7) { // July-Dec
+            return $year . '/' . ($year + 1);
+        } else { // Jan-Jun
+            return ($year - 1) . '/' . $year;
+        }
+    }
+
 }

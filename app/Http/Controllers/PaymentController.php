@@ -171,16 +171,20 @@ class PaymentController extends Controller
             ->pluck('year')
             ->toArray();
 
+        // Generate academic years format: 2023/2024
         $academicYears = [];
         foreach ($years as $year) {
-            $academicYears[] = ($year - 1) . '/' . $year;
-            $academicYears[] = $year . '/' . ($year + 1);
+            // Tambahkan format tahun ajaran (July-June)
+            $academicYear = $year . '/' . ($year + 1);
+            if (!in_array($academicYear, $academicYears)) {
+                $academicYears[] = $academicYear;
+            }
         }
 
-        // Tambahkan tahun pelajaran saat ini jika belum ada
-        $currentAcademicYear = (now()->month < 7 ? ($currentYear - 1) : $currentYear) . '/' . (now()->month < 7 ? $currentYear : ($currentYear + 1));
+        // Tambahkan tahun ajaran saat ini jika belum ada
+        $currentAcademicYear = $this->getCurrentAcademicYear();
         if (!in_array($currentAcademicYear, $academicYears)) {
-            $academicYears[] = $currentAcademicYear;
+            array_unshift($academicYears, $currentAcademicYear);
         }
 
         return array_unique($academicYears);
@@ -190,22 +194,31 @@ class PaymentController extends Controller
 
     public function index(Request $request)
     {
+        $currentAcademicYear = $this->getCurrentAcademicYear();
+        $academicYear = $request->input('academic_year', $currentAcademicYear);
+
+        // Validasi format tahun ajaran
+        if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) {
+            $academicYear = $currentAcademicYear;
+        }
+
+        try {
+            [$startYear, $endYear] = explode('/', $academicYear);
+        } catch (\Exception $e) {
+            // Fallback ke tahun ajaran saat ini jika parsing gagal
+            [$startYear, $endYear] = explode('/', $currentAcademicYear);
+        }
+
         $query = Student::with([
             'class',
-            'payments' => function ($q) use ($request) {
-                if ($request->has('academic_year') && $request->academic_year != '') {
-                    [$startYear, $endYear] = explode('/', $request->academic_year);
-                    $q->where(function ($query) use ($startYear, $endYear) {
-                        $query->whereYear('month', $startYear)
-                            ->whereMonth('month', '>=', 7)
-                            ->orWhereYear('month', $endYear)
-                            ->whereMonth('month', '<=', 6);
-                    });
-                } else {
-                    $q->whereYear('month', now()->year);
-                }
+            'payments' => function ($q) use ($startYear, $endYear) {
+                $q->where(function ($query) use ($startYear, $endYear) {
+                    $query->whereYear('month', $startYear)->whereMonth('month', '>=', 7)
+                        ->orWhereYear('month', $endYear)->whereMonth('month', '<=', 6);
+                });
             }
         ])->active();
+
 
         // Filter by class
         if ($request->has('class_id') && $request->class_id != '') {
@@ -215,34 +228,28 @@ class PaymentController extends Controller
         // Filter by payment status
         if ($request->has('payment_status') && $request->payment_status != 'all') {
             if ($request->payment_status == 'paid') {
-                $query->whereHas('payments', function ($q) use ($request) {
-                    if ($request->has('academic_year') && $request->academic_year != '') {
-                        [$startYear, $endYear] = explode('/', $request->academic_year);
+                $query->whereHas('payments', function ($q) use ($academicYear) {
+                    try {
+                        [$startYear, $endYear] = explode('/', $academicYear);
                         $q->where(function ($query) use ($startYear, $endYear) {
-                            $query->whereYear('month', $startYear)
-                                ->whereMonth('month', '>=', 7)
-                                ->orWhereYear('month', $endYear)
-                                ->whereMonth('month', '<=', 6);
-                        });
-                    } else {
-                        $q->whereYear('month', now()->year);
+                            $query->whereYear('month', $startYear)->whereMonth('month', '>=', 7)
+                                ->orWhereYear('month', $endYear)->whereMonth('month', '<=', 6);
+                        })->where('status', 'paid');
+                    } catch (\Exception $e) {
+                        Log::error("Error parsing academic year in payment filter: {$e->getMessage()}");
                     }
-                    $q->where('status', 'paid');
                 });
             } else {
-                $query->whereDoesntHave('payments', function ($q) use ($request) {
-                    if ($request->has('academic_year') && $request->academic_year != '') {
-                        [$startYear, $endYear] = explode('/', $request->academic_year);
+                $query->whereDoesntHave('payments', function ($q) use ($academicYear) {
+                    try {
+                        [$startYear, $endYear] = explode('/', $academicYear);
                         $q->where(function ($query) use ($startYear, $endYear) {
-                            $query->whereYear('month', $startYear)
-                                ->whereMonth('month', '>=', 7)
-                                ->orWhereYear('month', $endYear)
-                                ->whereMonth('month', '<=', 6);
-                        });
-                    } else {
-                        $q->whereYear('month', now()->year);
+                            $query->whereYear('month', $startYear)->whereMonth('month', '>=', 7)
+                                ->orWhereYear('month', $endYear)->whereMonth('month', '<=', 6);
+                        })->where('status', 'paid');
+                    } catch (\Exception $e) {
+                        Log::error("Error parsing academic year in unpaid filter: {$e->getMessage()}");
                     }
-                    $q->where('status', 'paid');
                 });
             }
         }
@@ -251,13 +258,11 @@ class PaymentController extends Controller
         $classes = ClassModel::all();
         $academicYears = $this->getAcademicYears();
 
-        // Get current academic year
-        $currentAcademicYear = $this->getCurrentAcademicYear();
-
         // Add payment status for each student
-        $students->each(function ($student) use ($request) {
+        $students->each(function ($student) use ($academicYear) {
+            request()->merge(['academic_year' => $academicYear]);
             $student->payment_status = $student->getPaymentStatusAttribute();
-            $student->unpaid_count = $student->unpaid_months->count();
+            $student->setRelation('unpaid_months', $student->unpaid_months);
         });
 
         return view('payments.index', compact(
@@ -268,6 +273,7 @@ class PaymentController extends Controller
         ));
     }
 
+
     /**
      * Get current academic year
      */
@@ -276,11 +282,9 @@ class PaymentController extends Controller
         $currentMonth = now()->month;
         $currentYear = now()->year;
 
-        if ($currentMonth >= 7) { // July or later
-            return $currentYear . '/' . ($currentYear + 1);
-        } else { // January to June
-            return ($currentYear - 1) . '/' . $currentYear;
-        }
+        // Tahun ajaran berjalan dari Juli 2023 - Juni 2024 (2023/2024)
+        return $currentMonth >= 7 ? $currentYear . '/' . ($currentYear + 1)
+            : ($currentYear - 1) . '/' . $currentYear;
     }
 
 
@@ -312,19 +316,24 @@ class PaymentController extends Controller
 
     public function create(Student $student)
     {
-        $unpaidMonths = $student->unpaid_months;
+        $unpaidMonths = $student->unpaid_months->map(function ($month) use ($student) {
+            // Tambahkan spp_cost_id ke setiap bulan
+            $month['spp_cost_id'] = SppCost::where('class_id', $student->class_id)
+                ->where('year', explode('-', $month['month'])[0])
+                ->first()->id ?? null;
+            return $month;
+        });
 
         if ($unpaidMonths->isEmpty()) {
             return redirect()->back()
                 ->with('error', 'Siswa ini tidak memiliki tunggakan SPP');
         }
 
-        $currentYear = now()->year;
-        $sppCost = SppCost::where('class_id', $student->class_id)
-            ->where('year', $currentYear)
-            ->first();
-
-        return view('payments.create', compact('student', 'unpaidMonths', 'sppCost'));
+        return view('payments.create', [
+            'student' => $student,
+            'unpaidMonths' => $unpaidMonths,
+            'sppCost' => $unpaidMonths->first()['amount'] ?? 0
+        ]);
     }
 
     public function store(Request $request, Student $student)

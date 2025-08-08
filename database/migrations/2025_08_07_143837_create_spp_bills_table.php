@@ -12,8 +12,9 @@ class CreateSppBillsTable extends Migration
             $table->id();
             $table->foreignId('student_id')->constrained()->onDelete('cascade');
             $table->foreignId('spp_cost_id')->constrained()->onDelete('cascade');
-            $table->integer('month');
-            $table->integer('year');
+            $table->string('academic_year')->nullable();
+            $table->integer('month')->nullable();
+            $table->integer('year')->nullable();
             $table->decimal('amount', 10, 2);
             $table->string('status')->default('unpaid');
             $table->timestamps();
