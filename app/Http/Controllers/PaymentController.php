@@ -5,159 +5,17 @@ namespace App\Http\Controllers;
 use App\Exports\PaymentsExport;
 use App\Models\ClassModel;
 use App\Models\Payment;
+use App\Models\SppBill;
 use App\Models\Student;
 use App\Models\SppCost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PaymentController extends Controller
 {
-    // public function index(Request $request)
-    // {
-    //     $query = Student::with([
-    //         'class',
-    //         'payments' => function ($q) {
-    //             $q->whereYear('month', now()->year);
-    //         }
-    //     ])->active();
-
-    //     // Filter berdasarkan kelas
-    //     if ($request->has('class_id') && $request->class_id != '') {
-    //         $query->where('class_id', $request->class_id);
-    //     }
-
-    //     // Filter berdasarkan status pembayaran
-    //     if ($request->has('payment_status') && $request->payment_status != 'all') {
-    //         if ($request->payment_status == 'paid') {
-    //             $query->whereHas('payments', function ($q) {
-    //                 $q->whereYear('month', now()->year)
-    //                     ->where('status', 'paid');
-    //             });
-    //         } else {
-    //             $query->whereDoesntHave('payments', function ($q) {
-    //                 $q->whereYear('month', now()->year)
-    //                     ->where('status', 'paid');
-    //             });
-    //         }
-    //     }
-
-    //     $students = $query->orderBy('name')->paginate(20);
-    //     $classes = ClassModel::all();
-
-    //     // Tambahkan informasi status pembayaran untuk setiap siswa
-    //     $students->each(function ($student) {
-    //         $student->payment_status = $student->getPaymentStatusAttribute();
-    //         $student->unpaid_count = $student->unpaid_months->count();
-    //     });
-
-    //     return view('payments.index', compact('students', 'classes'));
-    // }
-
-
-
-
-    // public function index(Request $request)
-    // {
-    //     $query = Student::with([
-    //         'class',
-    //         'payments' => function ($q) use ($request) {
-    //             // Filter pembayaran berdasarkan tahun pelajaran
-    //             if ($request->has('academic_year') && $request->academic_year != '') {
-    //                 [$startYear, $endYear] = explode('/', $request->academic_year);
-    //                 $q->where(function ($query) use ($startYear, $endYear) {
-    //                     $query->whereYear('month', $startYear)
-    //                         ->whereMonth('month', '>=', 7)
-    //                         ->orWhereYear('month', $endYear)
-    //                         ->whereMonth('month', '<=', 6);
-    //                 });
-    //             } else {
-    //                 $q->whereYear('month', now()->year);
-    //             }
-    //         }
-    //     ])->active();
-
-    //     // Filter berdasarkan kelas
-    //     if ($request->has('class_id') && $request->class_id != '') {
-    //         $query->where('class_id', $request->class_id);
-    //     }
-
-    //     // Filter berdasarkan status pembayaran
-    //     if ($request->has('payment_status') && $request->payment_status != 'all') {
-    //         if ($request->payment_status == 'paid') {
-    //             $query->whereHas('payments', function ($q) use ($request) {
-    //                 if ($request->has('academic_year') && $request->academic_year != '') {
-    //                     [$startYear, $endYear] = explode('/', $request->academic_year);
-    //                     $q->where(function ($query) use ($startYear, $endYear) {
-    //                         $query->whereYear('month', $startYear)
-    //                             ->whereMonth('month', '>=', 7)
-    //                             ->orWhereYear('month', $endYear)
-    //                             ->whereMonth('month', '<=', 6);
-    //                     });
-    //                 } else {
-    //                     $q->whereYear('month', now()->year);
-    //                 }
-    //                 $q->where('status', 'paid');
-    //             });
-    //         } else {
-    //             $query->whereDoesntHave('payments', function ($q) use ($request) {
-    //                 if ($request->has('academic_year') && $request->academic_year != '') {
-    //                     [$startYear, $endYear] = explode('/', $request->academic_year);
-    //                     $q->where(function ($query) use ($startYear, $endYear) {
-    //                         $query->whereYear('month', $startYear)
-    //                             ->whereMonth('month', '>=', 7)
-    //                             ->orWhereYear('month', $endYear)
-    //                             ->whereMonth('month', '<=', 6);
-    //                     });
-    //                 } else {
-    //                     $q->whereYear('month', now()->year);
-    //                 }
-    //                 $q->where('status', 'paid');
-    //             });
-    //         }
-    //     }
-
-    //     $students = $query->orderBy('name')->paginate(20);
-    //     $classes = ClassModel::all();
-
-    //     // Daftar tahun pelajaran untuk filter
-    //     $academicYears = $this->getAcademicYears();
-
-    //     // Tambahkan informasi status pembayaran untuk setiap siswa
-    //     $students->each(function ($student) use ($request) {
-    //         $student->payment_status = $student->getPaymentStatusAttribute();
-    //         $student->unpaid_count = $student->unpaid_months->count();
-    //     });
-
-    //     return view('payments.index', compact('students', 'classes', 'academicYears'));
-    // }
-
-    // /**
-    //  * Helper method untuk mendapatkan daftar tahun pelajaran
-    //  */
-    // protected function getAcademicYears()
-    // {
-    //     $currentYear = now()->year;
-    //     $years = Payment::select(DB::raw("DISTINCT YEAR(month) as year"))
-    //         ->orderBy('year', 'desc')
-    //         ->pluck('year')
-    //         ->toArray();
-
-    //     $academicYears = [];
-    //     foreach ($years as $year) {
-    //         $academicYears[] = ($year - 1) . '/' . $year;
-    //         $academicYears[] = $year . '/' . ($year + 1);
-    //     }
-
-    //     // Tambahkan tahun pelajaran saat ini jika belum ada
-    //     $currentAcademicYear = (now()->month < 7 ? ($currentYear - 1) : $currentYear) . '/' . (now()->month < 7 ? $currentYear : ($currentYear + 1));
-    //     if (!in_array($currentAcademicYear, $academicYears)) {
-    //         $academicYears[] = $currentAcademicYear;
-    //     }
-
-    //     return array_unique($academicYears);
-    // }
 
 
     /**
@@ -316,17 +174,22 @@ class PaymentController extends Controller
 
     public function create(Student $student)
     {
-        $unpaidMonths = $student->unpaid_months->map(function ($month) use ($student) {
-            // Tambahkan spp_cost_id ke setiap bulan
-            $month['spp_cost_id'] = SppCost::where('class_id', $student->class_id)
-                ->where('year', explode('-', $month['month'])[0])
-                ->first()->id ?? null;
-            return $month;
+        $unpaidMonths = $student->unpaid_months()->map(function ($bill) use ($student) {
+            return [
+                'month' => $bill['month'],
+                'year' => $bill['year'],
+                'month_name' => \Carbon\Carbon::create($bill['year'], $bill['month'], 1)->translatedFormat('F'),
+                'amount' => $bill['amount'],
+                'spp_cost_id' => $bill['spp_cost_id'] ?? SppCost::where('class_id', $student->class_id)
+                    ->where('year', explode('/', $bill['academic_year'])[0])
+                    ->first()->id ?? null,
+                'is_overdue' => \Carbon\Carbon::now()->year > $bill['year'] ||
+                    (\Carbon\Carbon::now()->year == $bill['year'] && \Carbon\Carbon::now()->month > $bill['month'])
+            ];
         });
 
         if ($unpaidMonths->isEmpty()) {
-            return redirect()->back()
-                ->with('error', 'Siswa ini tidak memiliki tunggakan SPP');
+            return redirect()->back()->with('error', 'Siswa ini tidak memiliki tunggakan SPP');
         }
 
         return view('payments.create', [
@@ -339,18 +202,19 @@ class PaymentController extends Controller
     public function store(Request $request, Student $student)
     {
         $validated = $request->validate([
-            'month' => 'required|date_format:Y-m',
+            'month' => 'required|string', // Accepts "month-year" format
             'amount' => 'required|numeric|min:0',
-            'payment_date' => 'required|date|before_or_equal:today',
+            'payment_date' => 'required|date|before_or_equal:' . now()->format('Y-m-d'),
             'spp_cost_id' => 'required|exists:spp_costs,id',
-            'payment_method' => 'required|string|in:cash,transfer,qris',
+            'payment_method' => 'required|string|in:cash,transfer,qris,other',
             'note' => 'nullable|string|max:500'
         ]);
 
-        // Tambahkan tanggal lengkap untuk bulan
-        $validated['month'] = $validated['month'] . '-01';
+        // Parse month and year from the combined value (e.g., "8-2025")
+        [$month, $year] = explode('-', $validated['month']);
+        $validated['month'] = Carbon::create($year, $month, 1)->format('Y-m-d');
 
-        DB::transaction(function () use ($validated, $student) {
+        DB::transaction(function () use ($validated, $student, $month, $year) {
             $payment = new Payment($validated + [
                 'status' => 'paid',
                 'admin_id' => auth()->id(),
@@ -358,6 +222,13 @@ class PaymentController extends Controller
             ]);
 
             $payment->save();
+
+            // Update the corresponding SppBill status to 'paid'
+            SppBill::where('student_id', $student->id)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->where('spp_cost_id', $validated['spp_cost_id'])
+                ->update(['status' => 'paid']);
         });
 
         return redirect()
